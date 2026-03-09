@@ -28,18 +28,34 @@ void RemotePlayInviteHandler::SendInvite(CSteamID invitee)
     RemotePlayPlayer_t rppInvitee = { invitee, m_remoteGuestID, m_groupID, 0, 0, 0 };
     ++m_remoteGuestID;
 
+    // some games (especially non-steam titles and emulators) do not automatically
+    // forward guest controller input via the normal "game" streaming path.
+    // enabling desktop streaming before the invite ensures the guest will always
+    // be able to send keyboard/mouse/controller events to the host.  We also
+    // explicitly allow controller input for the specific player after creating
+    // the session.
+    
+    // make sure desktop streaming is enabled whenever we are about to send an
+    // invite; this is a no-op for most Steam games but is required for desktop
+    // capture scenarios.
+    GClientContext()->RemoteClientManager()->SetStreamingDesktopToRemotePlayTogetherEnabled(true);
+    m_enabledDesktopStreaming = true;
+
     if (gameID.IsSteamApp() && gameID.AppID() != m_nonsteamAppID)
     {
         GClientContext()->RemoteClientManager()->BCreateRemotePlayInviteAndSession(rppInvitee, gameID.AppID());
     }
     else
     {
-        GClientContext()->RemoteClientManager()->SetStreamingDesktopToRemotePlayTogetherEnabled(true);
-
-        m_enabledDesktopStreaming = true;
-
         GClientContext()->RemoteClientManager()->BCreateRemotePlayInviteAndSession(rppInvitee, m_nonsteamAppID);
     }
+
+    // explicitly give the invited player permission to send controller, keyboard
+    // and mouse input.  this addresses situations where guests see the host but
+    // their controllers (or other input) are ignored.
+    GClientContext()->RemoteClientManager()->SetPerUserControllerInputEnabled(rppInvitee, true);
+    GClientContext()->RemoteClientManager()->SetPerUserKeyboardInputEnabled(rppInvitee, true);
+    GClientContext()->RemoteClientManager()->SetPerUserMouseInputEnabled(rppInvitee, true);
 }
 
 void RemotePlayInviteHandler::CancelInvite(CSteamID invitee, uint32 guestID)
@@ -65,11 +81,19 @@ void RemotePlayInviteHandler::OnRemotePlayInviteResult(RemotePlayInviteResult_t*
 {
     if (inviteResultCb->m_eResult == k_ERemoteClientLaunchResultOK)
     {
-        if (inviteResultCb->m_player.m_playerID.IsValid())
+        // when the session is successfully created we also proactively enable
+        // all input types for the joining player.  doing this here ensures the
+        // setting is applied after Steam has finished the launch handshake.
+        RemotePlayPlayer_t player = inviteResultCb->m_player;
+        GClientContext()->RemoteClientManager()->SetPerUserControllerInputEnabled(player, true);
+        GClientContext()->RemoteClientManager()->SetPerUserKeyboardInputEnabled(player, true);
+        GClientContext()->RemoteClientManager()->SetPerUserMouseInputEnabled(player, true);
+
+        if (player.m_playerID.IsValid())
         {
             char* buf = new char[1280];
             sprintf(buf, "Follow this link to join remote game: %s", inviteResultCb->m_szConnectURL);
-            GClientContext()->SteamFriends()->ReplyToFriendMessage(inviteResultCb->m_player.m_playerID, buf);
+            GClientContext()->SteamFriends()->ReplyToFriendMessage(player.m_playerID, buf);
             delete[] buf;
         }
         GClientContext()->RemoteClientManager()->ShowRemotePlayTogetherUI(GetRunningGameID().AppID());

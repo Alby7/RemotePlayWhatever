@@ -30,6 +30,11 @@ Download the latest RemotePlayWhatever [Release](https://github.com/m4dEngi/Remo
 2. Launch RemotePlayWhatever.
 3. Launch the game you want to play *through the Steam client*.
 4. Alt+Tab (or switch) back to the RemotePlayWhatever window.
+
+> **Tip:** guests' controllers, keyboard and mouse are automatically enabled when a
+> session starts, and desktop streaming is forced if necessary.  This resolves
+> the issue where connected guests could see the game but had no input.
+
 5. Invite your friend(s):
     - **Direct Invite:** Select a friend from the list. They will receive the invite link via a Steam Chat message.
     - **Guest Link:** Click the button to generate a guest invite link. The link will be automatically copied to your clipboard, ready for you to paste and share manually.
